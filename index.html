@@ -2,40 +2,67 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Mapa Libre con Buscador y Ubicación</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Mi Mapa Interactivo con Capas Dinámicas</title>
     
-    <!-- Cargar Leaflet CSS -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        html, body { height: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        #map { width: 100%; height: 100%; }
-        
-        /* Estilo para la barra de búsqueda flotante */
-        .search-box {
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: white;
-            padding: 8px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            width: 90%;
-            max-width: 350px;
+        html, body { 
+            height: 100%; 
+            margin: 0; 
+            padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
         }
-        .search-box input {
+        #map { width: 100%; height: 100%; z-index: 1; }
+        
+        /* Buscador adaptable */
+        .search-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            z-index: 1000;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .search-box {
             width: 100%;
-            padding: 8px;
-            font-size: 14px;
+            padding: 12px 15px;
+            font-size: 16px;
             border: 1px solid #ccc;
-            border-radius: 4px;
+            border-radius: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             box-sizing: border-box;
+            background: white;
+            outline: none;
+        }
+        
+        #suggestions {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            margin-top: 5px;
+            max-height: 50vh;
+            overflow-y: auto;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            display: none;
+            box-sizing: border-box;
+            z-index: 1001;
+        }
+        .suggestion-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        .suggestion-item:active {
+            background: #e0e0e0;
         }
 
-        /* Estilo para el botón flotante de geolocalización */
+        /* Botón de ubicación */
         .btn-ubicacion {
             position: absolute;
             bottom: 30px;
@@ -43,112 +70,244 @@
             z-index: 1000;
             background: white;
             border: none;
-            padding: 12px;
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             cursor: pointer;
-            font-size: 18px;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .btn-ubicacion:hover {
-            background: #f0f0f0;
+        .btn-ubicacion:active {
+            background: #e0e0e0;
         }
     </style>
 </head>
 <body>
 
-    <!-- Buscador sencillo vinculado a Nominatim -->
-    <div class="search-box">
-        <input type="text" id="busqueda" placeholder="Buscar lugar o dirección..." onkeypress="buscarLugar(event)">
+    <div class="search-container">
+        <input type="text" id="busqueda" class="search-box" placeholder="Buscar lugar o dirección..." autocomplete="off" oninput="buscarSugerencias(this.value)">
+        <div id="suggestions"></div>
     </div>
 
-    <!-- Botón flotante para ubicar mi posición -->
     <button class="btn-ubicacion" onclick="centrarUbicacion()" title="Mi ubicación actual">📍</button>
 
     <div id="map"></div>
 
-    <!-- Cargar Leaflet JS -->
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Librería para leer archivos KML/GeoJSON -->
+    <!-- Omnivore para leer KML -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js"></script>
+    <!-- Librería turf.js para calcular si un punto está dentro de un polígono KML -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
     <script>
-        // 1. Inicializar el mapa centrado en Barinas, Venezuela
-        var map = L.map('map').setView([8.6226, -70.2075], 13);
+        var map = L.map('map', { zoomControl: false }).setView([8.6226, -70.2075], 13);
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-        // 2. Agregar la capa base gratuita de OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // 3. Cargar tus capas personalizadas (Cambia 'tu_archivo_capas.kml' por el nombre de tu archivo KML)
-        var urlKML = 'comuna_barinasshp.kml'; 
-        var customLayer = omnivore.kml(urlKML)
-            .on('ready', function() {
-                // Ajusta el mapa automáticamente para mostrar tus capas al cargar
-                map.fitBounds(customLayer.getBounds());
+        var userLat = 8.6226, userLon = -70.2075;
+        var capaSeleccionada = null;
+        var kmlGeoJsonData = null;
+
+        // Estilos
+        var estiloNormal = {
+            color: '#3388ff',
+            weight: 2,
+            opacity: 0.65,
+            fillColor: '#3388ff',
+            fillOpacity: 0.2
+        };
+
+        var estiloResaltado = {
+            color: '#ff0000',
+            weight: 4,
+            opacity: 1,
+            fillColor: '#ff7800',
+            fillOpacity: 0.5
+        };
+
+        // Cargar KML
+        var urlKML = 'cuadrantes.kml';
+
+        var capaKML = omnivore.kml(urlKML)
+            .on('ready', function(e) {
+                kmlGeoJsonData = e.target.toGeoJSON();
+                
+                this.eachLayer(function (layer) {
+                    layer.setStyle(estiloNormal);
+
+                    layer.on('click', function (e) {
+                        resaltarCapa(layer);
+                        mostrarPopupCapa(layer);
+                    });
+                });
+
+                // 1. Detección y centrado automático de la ubicación al iniciar la carga
+                centrarUbicacion();
+            })
+            .on('error', function() {
+                alert("Error al cargar el archivo KML. Verifica que la ruta o el archivo sean válidos.");
             })
             .addTo(map);
 
-        // 4. Función de buscador gratuito (Nominatim)
-        var marcadorBusqueda;
-        function buscarLugar(e) {
-            if (e.key === 'Enter') {
-                var query = document.getElementById('busqueda').value;
-                fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query))
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.length > 0) {
-                            var lat = data[0].lat;
-                            var lon = data[0].lon;
-                            map.setView([lat, lon], 16);
-                            
-                            if (marcadorBusqueda) {
-                                map.removeLayer(marcadorBusqueda);
-                            }
-                            marcadorBusqueda = L.marker([lat, lon]).addTo(map)
-                                .bindPopup(data[0].display_name)
-                                .openPopup();
-                        } else {
-                            alert("No se encontró el lugar.");
-                        }
-                    });
+        // Función para cambiar el estilo visual de la capa seleccionada
+        function resaltarCapa(layerToSelect) {
+            if (capaSeleccionada && capaSeleccionada !== layerToSelect) {
+                if (capaSeleccionada.setStyle) {
+                    capaSeleccionada.setStyle(estiloNormal);
+                }
+            }
+            capaSeleccionada = layerToSelect;
+            if (capaSeleccionada && capaSeleccionada.setStyle) {
+                capaSeleccionada.setStyle(estiloResaltado);
             }
         }
 
-        // 5. Función para detectar y mostrar la ubicación actual del usuario en tiempo real
+        // Función para abrir el popup con la información del KML
+        function mostrarPopupCapa(layer, textoPrefijo) {
+            var props = layer.feature.properties;
+            var contenido = `<div style="max-width: 220px;">`;
+            if (textoPrefijo) {
+                contenido += `<small><b>${textoPrefijo}</b></small><br>`;
+            }
+            contenido += `<b>${props.name || 'Zona sin nombre'}</b>`;
+            if (props.description) {
+                contenido += `<br>${props.description}`;
+            }
+            contenido += `</div>`;
+            layer.bindPopup(contenido).openPopup();
+        }
+
+        // Evalúa las coordenadas dadas contra los polígonos cargados del KML
+        function evaluarYResaltarPunto(lat, lon, prefijoTexto) {
+            if (!kmlGeoJsonData) return;
+
+            var punto = turf.point([parseFloat(lon), parseFloat(lat)]);
+            var zonaEncontrada = null;
+
+            capaKML.eachLayer(function(layer) {
+                if (layer.feature && layer.feature.geometry) {
+                    try {
+                        var dentro = turf.booleanPointInPolygon(punto, layer.feature);
+                        if (dentro) {
+                            zonaEncontrada = layer;
+                        }
+                    } catch (err) {
+                        // Ignorar geometrías no soportadas por booleanPointInPolygon
+                    }
+                }
+            });
+
+            if (zonaEncontrada) {
+                resaltarCapa(zonaEncontrada);
+                mostrarPopupCapa(zonaEncontrada, prefijoTexto);
+            } else if (capaSeleccionada) {
+                // Restablecer si la ubicación queda fuera de todas las zonas
+                capaSeleccionada.setStyle(estiloNormal);
+                capaSeleccionada = null;
+            }
+        }
+
+        // Buscador con autocompletado
+        var timeoutId;
+        function buscarSugerencias(query) {
+            clearTimeout(timeoutId);
+            var suggestionsDiv = document.getElementById('suggestions');
+            
+            if (query.length < 3) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            timeoutId = setTimeout(() => {
+                var boxSize = 0.5;
+                var viewbox = `${userLon - boxSize},${userLat + boxSize},${userLon + boxSize},${userLat - boxSize}`;
+                var url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=0&limit=5`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        suggestionsDiv.innerHTML = '';
+                        if (data.length > 0) {
+                            suggestionsDiv.style.display = 'block';
+                            data.forEach(item => {
+                                var div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerText = item.display_name;
+                                div.onclick = function() {
+                                    seleccionarLugar(item.lat, item.lon, item.display_name);
+                                };
+                                suggestionsDiv.appendChild(div);
+                            });
+                        } else {
+                            suggestionsDiv.style.display = 'none';
+                        }
+                    });
+            }, 300);
+        }
+
+        var marcadorBusqueda;
+        function seleccionarLugar(lat, lon, nombre) {
+            document.getElementById('busqueda').value = nombre;
+            document.getElementById('suggestions').style.display = 'none';
+            
+            var targetLat = parseFloat(lat);
+            var targetLon = parseFloat(lon);
+            map.setView([targetLat, targetLon], 16);
+
+            if (marcadorBusqueda) { map.removeLayer(marcadorBusqueda); }
+            marcadorBusqueda = L.marker([targetLat, targetLon]).addTo(map).bindPopup(nombre).openPopup();
+
+            // 2. Resaltar la zona correspondiente al lugar buscado
+            evaluarYResaltarPunto(targetLat, targetLon, "Zona correspondiente:");
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!document.querySelector('.search-container').contains(e.target)) {
+                document.getElementById('suggestions').style.display = 'none';
+            }
+        });
+
+        // Geolocalización
         var markerUbicacion, circuloUbicacion;
         function centrarUbicacion() {
             if (!navigator.geolocation) {
-                alert("Tu navegador no soporta geolocalización.");
+                alert("Tu dispositivo no soporta geolocalización.");
                 return;
             }
 
             navigator.geolocation.getCurrentPosition(function(position) {
-                var lat = position.coords.latitude;
-                var lon = position.coords.longitude;
+                userLat = position.coords.latitude;
+                userLon = position.coords.longitude;
                 var accuracy = position.coords.accuracy;
 
-                // Centrar mapa en la posición detectada con zoom cercano
-                map.setView([lat, lon], 16);
+                map.setView([userLat, userLon], 16);
 
-                // Si ya existían marcadores previos de ubicación, eliminarlos para actualizarlos
                 if (markerUbicacion) {
                     map.removeLayer(markerUbicacion);
                     map.removeLayer(circuloUbicacion);
                 }
 
-                // Añadir marcador en la posición exacta
-                markerUbicacion = L.marker([lat, lon]).addTo(map)
-                    .bindPopup("¡Estás aquí!").openPopup();
+                markerUbicacion = L.marker([userLat, userLon]).addTo(map)
+                    .bindPopup("<b>¡Estás aquí!</b>");
 
-                // Añadir un círculo que muestra el radio de precisión de la señal GPS
-                circuloUbicacion = L.circle([lat, lon], { radius: accuracy }).addTo(map);
+                circuloUbicacion = L.circle([userLat, userLon], { radius: accuracy }).addTo(map);
+
+                // Resaltar la zona actual del usuario
+                evaluarYResaltarPunto(userLat, userLon, "Te encuentras en:");
 
             }, function(error) {
-                alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos de GPS en tu navegador.");
+                console.log("No se pudo obtener la ubicación o el permiso fue denegado.");
             }, {
-                enableHighAccuracy: true
+                enableHighAccuracy: true,
+                timeout: 10000
             });
         }
     </script>

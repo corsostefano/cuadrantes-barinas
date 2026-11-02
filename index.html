@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Mapa Libre con Buscador y Ubicación</title>
+    
+    <!-- Cargar Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        html, body { height: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { width: 100%; height: 100%; }
+        
+        /* Estilo para la barra de búsqueda flotante */
+        .search-box {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 350px;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        /* Estilo para el botón flotante de geolocalización */
+        .btn-ubicacion {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            border: none;
+            padding: 12px;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .btn-ubicacion:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Buscador sencillo vinculado a Nominatim -->
+    <div class="search-box">
+        <input type="text" id="busqueda" placeholder="Buscar lugar o dirección..." onkeypress="buscarLugar(event)">
+    </div>
+
+    <!-- Botón flotante para ubicar mi posición -->
+    <button class="btn-ubicacion" onclick="centrarUbicacion()" title="Mi ubicación actual">📍</button>
+
+    <div id="map"></div>
+
+    <!-- Cargar Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Librería para leer archivos KML/GeoJSON -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js"></script>
+
+    <script>
+        // 1. Inicializar el mapa centrado en Barinas, Venezuela
+        var map = L.map('map').setView([8.6226, -70.2075], 13);
+
+        // 2. Agregar la capa base gratuita de OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // 3. Cargar tus capas personalizadas (Cambia 'tu_archivo_capas.kml' por el nombre de tu archivo KML)
+        var urlKML = 'comuna_barinasshp.kmz'; 
+        var customLayer = omnivore.kml(urlKML)
+            .on('ready', function() {
+                // Ajusta el mapa automáticamente para mostrar tus capas al cargar
+                map.fitBounds(customLayer.getBounds());
+            })
+            .addTo(map);
+
+        // 4. Función de buscador gratuito (Nominatim)
+        var marcadorBusqueda;
+        function buscarLugar(e) {
+            if (e.key === 'Enter') {
+                var query = document.getElementById('busqueda').value;
+                fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.length > 0) {
+                            var lat = data[0].lat;
+                            var lon = data[0].lon;
+                            map.setView([lat, lon], 16);
+                            
+                            if (marcadorBusqueda) {
+                                map.removeLayer(marcadorBusqueda);
+                            }
+                            marcadorBusqueda = L.marker([lat, lon]).addTo(map)
+                                .bindPopup(data[0].display_name)
+                                .openPopup();
+                        } else {
+                            alert("No se encontró el lugar.");
+                        }
+                    });
+            }
+        }
+
+        // 5. Función para detectar y mostrar la ubicación actual del usuario en tiempo real
+        var markerUbicacion, circuloUbicacion;
+        function centrarUbicacion() {
+            if (!navigator.geolocation) {
+                alert("Tu navegador no soporta geolocalización.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lon = position.coords.longitude;
+                var accuracy = position.coords.accuracy;
+
+                // Centrar mapa en la posición detectada con zoom cercano
+                map.setView([lat, lon], 16);
+
+                // Si ya existían marcadores previos de ubicación, eliminarlos para actualizarlos
+                if (markerUbicacion) {
+                    map.removeLayer(markerUbicacion);
+                    map.removeLayer(circuloUbicacion);
+                }
+
+                // Añadir marcador en la posición exacta
+                markerUbicacion = L.marker([lat, lon]).addTo(map)
+                    .bindPopup("¡Estás aquí!").openPopup();
+
+                // Añadir un círculo que muestra el radio de precisión de la señal GPS
+                circuloUbicacion = L.circle([lat, lon], { radius: accuracy }).addTo(map);
+
+            }, function(error) {
+                alert("No se pudo obtener tu ubicación. Asegúrate de dar permisos de GPS en tu navegador.");
+            }, {
+                enableHighAccuracy: true
+            });
+        }
+    </script>
+</body>
+</html>

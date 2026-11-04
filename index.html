@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Mi Mapa Interactivo con Capas Dinámicas</title>
+    <link rel="icon" type="image/png" href="icono.png">
+    <title>Ven911 Barinas: Cuadrantes</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,26 +16,27 @@
             padding: 0; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden;
+            background: #f4f6f9;
         }
         #map { width: 100%; height: 100%; z-index: 1; }
         
-        /* Buscador adaptable */
+        /* Contenedor del Buscador */
         .search-container {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
+            top: 12px;
+            left: 12px;
+            right: 12px;
             z-index: 1000;
             max-width: 500px;
             margin: 0 auto;
         }
         .search-box {
             width: 100%;
-            padding: 12px 15px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 25px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            padding: 14px 18px;
+            font-size: 15px;
+            border: 1px solid #dcdfe6;
+            border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             box-sizing: border-box;
             background: white;
             outline: none;
@@ -42,65 +44,117 @@
         
         #suggestions {
             background: white;
-            border: 1px solid #ddd;
             border-radius: 15px;
-            margin-top: 5px;
-            max-height: 50vh;
+            margin-top: 6px;
+            max-height: 45vh;
             overflow-y: auto;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
             display: none;
             box-sizing: border-box;
             z-index: 1001;
         }
         .suggestion-item {
-            padding: 12px 15px;
+            padding: 12px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f0f0f0;
             font-size: 14px;
         }
-        .suggestion-item:active {
-            background: #e0e0e0;
+        .suggestion-item:active { background: #eef2f7; }
+        .suggestion-tag {
+            display: inline-block;
+            background: #0056b3;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 6px;
+        }
+        .suggestion-tag-osm {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 6px;
         }
 
         /* Botón de ubicación */
         .btn-ubicacion {
             position: absolute;
             bottom: 30px;
-            right: 20px;
+            right: 18px;
             z-index: 1000;
-            background: white;
+            background: #0056b3;
+            color: white;
             border: none;
-            width: 55px;
-            height: 55px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3);
             cursor: pointer;
-            font-size: 22px;
+            font-size: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .btn-ubicacion:active {
-            background: #e0e0e0;
+        .btn-ubicacion:active { background: #003d80; }
+
+        /* Panel Inferior Emergencias (Bottom Card) */
+        .info-card {
+            position: absolute;
+            bottom: 20px;
+            left: 12px;
+            right: 80px;
+            z-index: 1000;
+            background: white;
+            border-radius: 16px;
+            padding: 14px 16px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+            display: none;
+            max-width: 420px;
+        }
+        .info-card h4 { margin: 0 0 4px 0; color: #111; font-size: 16px; }
+        .info-card p { margin: 3px 0; color: #555; font-size: 13px; line-height: 1.3; }
+        .btn-call {
+            display: inline-block;
+            margin-top: 8px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
     <div class="search-container">
-        <input type="text" id="busqueda" class="search-box" placeholder="Buscar lugar o dirección..." autocomplete="off" oninput="buscarSugerencias(this.value)">
+        <input type="text" id="busqueda" class="search-box" placeholder="Buscar cuadrante, sector o lugar en Barinas..." autocomplete="off" oninput="buscarMulticriterio(this.value)">
         <div id="suggestions"></div>
     </div>
 
     <button class="btn-ubicacion" onclick="centrarUbicacion()" title="Mi ubicación actual">📍</button>
 
+    <!-- Panel de información de Cuadrante Activo -->
+    <div id="infoCard" class="info-card">
+        <h4 id="cardTitulo">Cuadrante Seleccionado</h4>
+        <p id="cardOrganismo" style="font-weight: bold; color: #0056b3;"></p>
+        <p id="cardZonas"></p>
+        <p id="cardUbicacion"></p>
+        <a id="cardBtnLlamar" href="#" class="btn-call">📞 Llamar al Cuadrante</a>
+        <a href="tel:911" class="btn-call" style="background: #dc3545;">🚨 VEN 911</a>
+    </div>
+
     <div id="map"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Omnivore para leer KML -->
+    <!-- Omnivore KML -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js"></script>
-    <!-- Librería turf.js para calcular si un punto está dentro de un polígono KML -->
+    <!-- Turf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
     <script>
@@ -109,55 +163,60 @@
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; VEN 9-1-1 Barinas'
         }).addTo(map);
 
         var userLat = 8.6226, userLon = -70.2075;
         var capaSeleccionada = null;
         var kmlGeoJsonData = null;
+        var listaCuadrantes = [];
+        var marcadorBusqueda;
 
-        // Estilos
         var estiloNormal = {
-            color: '#3388ff',
+            color: '#0056b3',
             weight: 2,
-            opacity: 0.65,
-            fillColor: '#3388ff',
-            fillOpacity: 0.2
+            opacity: 0.7,
+            fillColor: '#0056b3',
+            fillOpacity: 0.15
         };
 
         var estiloResaltado = {
-            color: '#ff0000',
+            color: '#dc3545',
             weight: 4,
             opacity: 1,
-            fillColor: '#ff7800',
-            fillOpacity: 0.5
+            fillColor: '#ffc107',
+            fillOpacity: 0.45
         };
 
-        // Cargar KML
         var urlKML = 'cuadrante_nomenclatura.kml';
 
         var capaKML = omnivore.kml(urlKML)
             .on('ready', function(e) {
                 kmlGeoJsonData = e.target.toGeoJSON();
-                
+                listaCuadrantes = [];
+
                 this.eachLayer(function (layer) {
                     layer.setStyle(estiloNormal);
+                    
+                    if (layer.feature && layer.feature.properties) {
+                        listaCuadrantes.push({
+                            layer: layer,
+                            props: layer.feature.properties
+                        });
+                    }
 
                     layer.on('click', function (e) {
-                        resaltarCapa(layer);
-                        mostrarPopupCapa(layer);
+                        seleccionarCuadranteDirecto(layer);
                     });
                 });
 
-                // 1. Detección y centrado automático de la ubicación al iniciar la carga
                 centrarUbicacion();
             })
             .on('error', function() {
-                alert("Error al cargar el archivo KML. Verifica que la ruta o el archivo sean válidos.");
+                alert("Error al cargar la capa de Cuadrantes de Paz (cuadrante_nomenclatura.kml).");
             })
             .addTo(map);
 
-        // Función para cambiar el estilo visual de la capa seleccionada
         function resaltarCapa(layerToSelect) {
             if (capaSeleccionada && capaSeleccionada !== layerToSelect) {
                 if (capaSeleccionada.setStyle) {
@@ -170,25 +229,38 @@
             }
         }
 
-        // Función para abrir el popup con la información del KML
-        function mostrarPopupCapa(layer, textoPrefijo) {
+        function seleccionarCuadranteDirecto(layer) {
+            resaltarCapa(layer);
             var props = layer.feature.properties;
-            var contenido = `<div style="max-width: 220px;">`;
-            if (textoPrefijo) {
-                contenido += `<small><b>${textoPrefijo}</b></small><br>`;
+            
+            // Mapeo ordenado con las nuevas etiquetas del KML
+            var codCuadrante = props.CUADRANTE || props.nomenclatura || props.name || 'Cuadrante de Paz';
+            var nombreZona = props.NOMBRE || props.COMUNA || '';
+            
+            document.getElementById('cardTitulo').innerText = codCuadrante + (nombreZona ? ' - ' + nombreZona : '');
+            document.getElementById('cardOrganismo').innerText = 'Organismo: ' + (props.ORGANISMOS || props.ORGANISMO || 'No especificado');
+            document.getElementById('cardZonas').innerText = 'Zonas/Sectores: ' + (props.ZONAS || props.sectores || 'Sin especificar');
+            document.getElementById('cardUbicacion').innerText = (props.PARROQUIA ? 'Parroquia: ' + props.PARROQUIA : '') + (props.MUNICIPIO ? ' | Mpio: ' + props.MUNICIPIO : '');
+            
+            var btnTel = document.getElementById('cardBtnLlamar');
+            var telefono = props.NUM_TLF || props.telefono_cuadrante || props.TLF_VOCERO;
+            if (telefono) {
+                btnTel.href = 'tel:' + telefono;
+                btnTel.style.display = 'inline-block';
+                btnTel.innerText = '📞 Llamar (' + telefono + ')';
+            } else {
+                btnTel.style.display = 'none';
             }
-            contenido += `<b>${props.name || 'Zona sin nombre'}</b>`;
-            if (props.description) {
-                contenido += `<br>${props.description}`;
-            }
-            contenido += `</div>`;
-            layer.bindPopup(contenido).openPopup();
+
+            document.getElementById('infoCard').style.display = 'block';
+            
+            try {
+                map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+            } catch(err){}
         }
 
-        // Evalúa las coordenadas dadas contra los polígonos cargados del KML
-        function evaluarYResaltarPunto(lat, lon, prefijoTexto) {
+        function evaluarYResaltarPunto(lat, lon) {
             if (!kmlGeoJsonData) return;
-
             var punto = turf.point([parseFloat(lon), parseFloat(lat)]);
             var zonaEncontrada = null;
 
@@ -196,119 +268,130 @@
                 if (layer.feature && layer.feature.geometry) {
                     try {
                         var dentro = turf.booleanPointInPolygon(punto, layer.feature);
-                        if (dentro) {
-                            zonaEncontrada = layer;
-                        }
-                    } catch (err) {
-                        // Ignorar geometrías no soportadas por booleanPointInPolygon
-                    }
+                        if (dentro) { zonaEncontrada = layer; }
+                    } catch (err) {}
                 }
             });
 
             if (zonaEncontrada) {
-                resaltarCapa(zonaEncontrada);
-                mostrarPopupCapa(zonaEncontrada, prefijoTexto);
-            } else if (capaSeleccionada) {
-                // Restablecer si la ubicación queda fuera de todas las zonas
-                capaSeleccionada.setStyle(estiloNormal);
-                capaSeleccionada = null;
+                seleccionarCuadranteDirecto(zonaEncontrada);
             }
         }
 
-        // Buscador con autocompletado
+        // Buscador Coexistente: KML interno + Nominatim OSM (limitado a Barinas, Venezuela)
         var timeoutId;
-        function buscarSugerencias(query) {
+        function buscarMulticriterio(query) {
             clearTimeout(timeoutId);
             var suggestionsDiv = document.getElementById('suggestions');
-            
-            if (query.length < 3) {
+            suggestionsDiv.innerHTML = '';
+
+            if (query.length < 2) {
                 suggestionsDiv.style.display = 'none';
                 return;
             }
 
-            timeoutId = setTimeout(() => {
-                var boxSize = 0.5;
-                var viewbox = `${userLon - boxSize},${userLat + boxSize},${userLon + boxSize},${userLat - boxSize}`;
-                var url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=0&limit=5`;
+            var q = query.toLowerCase();
 
-                fetch(url)
+            // 1. Filtrar coincidencias del KML (Cuadrantes, Zonas, Municipios, Parroquias)
+            var coincidenciasKML = listaCuadrantes.filter(item => {
+                var p = item.props;
+                var cuad = (p.CUADRANTE || p.nomenclatura || '').toLowerCase();
+                var nom = (p.NOMBRE || p.COMUNA || p.name || '').toLowerCase();
+                var zon = (p.ZONAS || p.sectores || '').toLowerCase();
+                var mun = (p.MUNICIPIO || '').toLowerCase();
+                var par = (p.PARROQUIA || '').toLowerCase();
+                return cuad.includes(q) || nom.includes(q) || zon.includes(q) || mun.includes(q) || par.includes(q);
+            });
+
+            timeoutId = setTimeout(() => {
+                // 2. Consultar Nominatim OSM restringido al Estado Barinas, Venezuela
+                var urlOSM = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + " Barinas Venezuela")}&limit=4`;
+
+                fetch(urlOSM)
                     .then(response => response.json())
-                    .then(data => {
+                    .then(dataOSM => {
                         suggestionsDiv.innerHTML = '';
-                        if (data.length > 0) {
-                            suggestionsDiv.style.display = 'block';
-                            data.forEach(item => {
+                        var totalSugerencias = 0;
+
+                        // Mostrar primero los Cuadrantes del KML encontrados
+                        if (coincidenciasKML.length > 0) {
+                            coincidenciasKML.slice(0, 4).forEach(item => {
+                                totalSugerencias++;
                                 var div = document.createElement('div');
                                 div.className = 'suggestion-item';
-                                div.innerText = item.display_name;
+                                var p = item.props;
+                                var tituloC = p.CUADRANTE || p.nomenclatura || p.name;
+                                div.innerHTML = `<span class="suggestion-tag">Cuadrante</span> <b>${tituloC}</b> - <small>${p.MUNICIPIO || ''}</small>`;
                                 div.onclick = function() {
-                                    seleccionarLugar(item.lat, item.lon, item.display_name);
+                                    document.getElementById('busqueda').value = tituloC;
+                                    suggestionsDiv.style.display = 'none';
+                                    seleccionarCuadranteDirecto(item.layer);
                                 };
                                 suggestionsDiv.appendChild(div);
                             });
+                        }
+
+                        // Mostrar luego los lugares externos de OpenStreetMap en Barinas
+                        if (dataOSM.length > 0) {
+                            dataOSM.forEach(item => {
+                                totalSugerencias++;
+                                var div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerHTML = `<span class="suggestion-tag-osm">Lugar</span> ${item.display_name}`;
+                                div.onclick = function() {
+                                    document.getElementById('busqueda').value = item.display_name;
+                                    suggestionsDiv.style.display = 'none';
+                                    
+                                    var lat = parseFloat(item.lat);
+                                    var lon = parseFloat(item.lon);
+                                    map.setView([lat, lon], 16);
+
+                                    if (marcadorBusqueda) { map.removeLayer(marcadorBusqueda); }
+                                    marcadorBusqueda = L.marker([lat, lon]).addTo(map).bindPopup(item.display_name).openPopup();
+
+                                    // Evaluar automáticamente si este lugar cae dentro de un cuadrante de paz
+                                    evaluarYResaltarPunto(lat, lon);
+                                };
+                                suggestionsDiv.appendChild(div);
+                            });
+                        }
+
+                        if (totalSugerencias > 0) {
+                            suggestionsDiv.style.display = 'block';
                         } else {
                             suggestionsDiv.style.display = 'none';
+                        }
+                    })
+                    .catch(err => {
+                        // Si falla la red exterior, muestra al menos las coincidencias del KML
+                        if (coincidenciasKML.length > 0) {
+                            suggestionsDiv.style.display = 'block';
                         }
                     });
             }, 300);
         }
 
-        var marcadorBusqueda;
-        function seleccionarLugar(lat, lon, nombre) {
-            document.getElementById('busqueda').value = nombre;
-            document.getElementById('suggestions').style.display = 'none';
-            
-            var targetLat = parseFloat(lat);
-            var targetLon = parseFloat(lon);
-            map.setView([targetLat, targetLon], 16);
-
-            if (marcadorBusqueda) { map.removeLayer(marcadorBusqueda); }
-            marcadorBusqueda = L.marker([targetLat, targetLon]).addTo(map).bindPopup(nombre).openPopup();
-
-            // 2. Resaltar la zona correspondiente al lugar buscado
-            evaluarYResaltarPunto(targetLat, targetLon, "Zona correspondiente:");
-        }
-
-        document.addEventListener('click', function(e) {
-            if (!document.querySelector('.search-container').contains(e.target)) {
-                document.getElementById('suggestions').style.display = 'none';
-            }
-        });
-
-        // Geolocalización
         var markerUbicacion, circuloUbicacion;
         function centrarUbicacion() {
-            if (!navigator.geolocation) {
-                alert("Tu dispositivo no soporta geolocalización.");
-                return;
-            }
+            if (!navigator.geolocation) return;
 
             navigator.geolocation.getCurrentPosition(function(position) {
                 userLat = position.coords.latitude;
                 userLon = position.coords.longitude;
                 var accuracy = position.coords.accuracy;
 
-                map.setView([userLat, userLon], 16);
+                map.setView([userLat, userLon], 15);
 
                 if (markerUbicacion) {
                     map.removeLayer(markerUbicacion);
                     map.removeLayer(circuloUbicacion);
                 }
 
-                markerUbicacion = L.marker([userLat, userLon]).addTo(map)
-                    .bindPopup("<b>¡Estás aquí!</b>");
+                markerUbicacion = L.marker([userLat, userLon]).addTo(map).bindPopup("<b>Ubicación del Dispositivo</b>");
+                circuloUbicacion = L.circle([userLat, userLon], { radius: accuracy, color: '#28a745' }).addTo(map);
 
-                circuloUbicacion = L.circle([userLat, userLon], { radius: accuracy }).addTo(map);
-
-                // Resaltar la zona actual del usuario
-                evaluarYResaltarPunto(userLat, userLon, "Te encuentras en:");
-
-            }, function(error) {
-                console.log("No se pudo obtener la ubicación o el permiso fue denegado.");
-            }, {
-                enableHighAccuracy: true,
-                timeout: 10000
-            });
+                evaluarYResaltarPunto(userLat, userLon);
+            }, function(error) {}, { enableHighAccuracy: true, timeout: 10000 });
         }
     </script>
 </body>

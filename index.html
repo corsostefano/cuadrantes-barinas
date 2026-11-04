@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <link rel="shortcut icon" href="icono.png" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="icon" type="image/png" href="icono.png">
     <title>Ven911 Barinas: Cuadrantes</title>
     
     <!-- Leaflet CSS -->
@@ -20,7 +20,57 @@
         }
         #map { width: 100%; height: 100%; z-index: 1; }
         
-        /* Contenedor del Buscador */
+        /* --------------------------------------------------
+           PANTALLA DE BIENVENIDA (SPLASH SCREEN)
+        -------------------------------------------------- */
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0d2b45 0%, #203c56 100%);
+            color: white;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 40px 20px;
+            box-sizing: border-box;
+            transition: opacity 0.6s ease-out, visibility 0.6s;
+            text-align: center;
+        }
+        .splash-content {
+            margin-auto: 0;
+        }
+        .splash-title {
+            font-size: 26px;
+            font-weight: bold;
+            margin-top: 15px;
+            letter-spacing: 1px;
+        }
+        .splash-subtitle {
+            font-size: 15px;
+            color: #4da6ff;
+            margin-top: 5px;
+        }
+        .splash-badge {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin-top: 20px;
+        }
+        .splash-credits {
+            font-size: 12px;
+            color: #b0c4de;
+        }
+
+        /* --------------------------------------------------
+           INTERFAZ PRINCIPAL
+        -------------------------------------------------- */
         .search-container {
             position: absolute;
             top: 12px;
@@ -32,7 +82,7 @@
         }
         .search-box {
             width: 100%;
-            padding: 14px 18px;
+            padding: 14px 45px 14px 18px;
             font-size: 15px;
             border: 1px solid #dcdfe6;
             border-radius: 30px;
@@ -42,6 +92,25 @@
             outline: none;
         }
         
+        .clear-btn {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e0e0e0;
+            border: none;
+            color: #555;
+            font-size: 14px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1002;
+        }
+
         #suggestions {
             background: white;
             border-radius: 15px;
@@ -59,7 +128,6 @@
             border-bottom: 1px solid #f0f0f0;
             font-size: 14px;
         }
-        .suggestion-item:active { background: #eef2f7; }
         .suggestion-tag {
             display: inline-block;
             background: #0056b3;
@@ -98,14 +166,13 @@
             align-items: center;
             justify-content: center;
         }
-        .btn-ubicacion:active { background: #003d80; }
 
         /* Panel Inferior Emergencias (Bottom Card) */
         .info-card {
             position: absolute;
             bottom: 20px;
             left: 12px;
-            right: 80px;
+            right: 84px;
             z-index: 1000;
             background: white;
             border-radius: 16px;
@@ -127,12 +194,45 @@
             font-size: 13px;
             font-weight: bold;
         }
+
+        /* Pie de página con créditos flotante */
+        .footer-credits {
+            position: absolute;
+            top: 95%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
 
+    <!-- 1. PANTALLA DE BIENVENIDA / SPLASH SCREEN -->
+    <div id="splashScreen">
+        <div class="splash-content" style="margin-top: auto;">
+            <div style="font-size: 60px;"><img src="icono.png" alt="" style="width: 200px;"></div>
+            <div class="splash-title">Ven911 Barinas</div>
+            <div class="splash-subtitle">Localizador de Cuadrantes de Paz</div>
+            <div class="splash-badge">Estado Barinas - Venezuela</div>
+        </div>
+        <div class="splash-credits">
+            Desarrollada por <b>Stefano Corso</b><br>
+            VEN 9-1-1 Barinas &copy; 2026
+        </div>
+    </div>
+
+    <!-- Créditos flotantes discretos -->
+    <div class="footer-credits">Desarrollado por Stefano Corso - VEN 9-1-1</div>
+
     <div class="search-container">
-        <input type="text" id="busqueda" class="search-box" placeholder="Buscar cuadrante, sector o lugar en Barinas..." autocomplete="off" oninput="buscarMulticriterio(this.value)">
+        <input type="text" id="busqueda" class="search-box" placeholder="Buscar cuadrante, comuna o sector en Barinas..." autocomplete="off" oninput="manejarInputBusqueda(this.value)">
+        <button id="clearBtn" class="clear-btn" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
         <div id="suggestions"></div>
     </div>
 
@@ -158,13 +258,37 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 
     <script>
-        var map = L.map('map', { zoomControl: false }).setView([8.6226, -70.2075], 13);
+        // Ocultar pantalla de bienvenida tras 2.5 segundos
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                var splash = document.getElementById('splashScreen');
+                splash.style.opacity = '0';
+                splash.style.visibility = 'hidden';
+            }, 2500);
+        });
+
+        // Configuración del Mapa con capas alternables (Callejero y Satelital)
+        var mapaBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '&copy; OpenStreetMap'
+        });
+
+        var mapaSatelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 18, attribution: '&copy; Esri World Imagery'
+        });
+
+        var map = L.map('map', { 
+            zoomControl: false,
+            layers: [mapaBase] 
+        }).setView([8.6226, -70.2075], 13);
+
         L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; VEN 9-1-1 Barinas'
-        }).addTo(map);
+        // Control de Capas
+        var baseMaps = {
+            "Callejero": mapaBase,
+            "Satelital": mapaSatelital
+        };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
         var userLat = 8.6226, userLon = -70.2075;
         var capaSeleccionada = null;
@@ -213,7 +337,7 @@
                 centrarUbicacion();
             })
             .on('error', function() {
-                alert("Error al cargar la capa de Cuadrantes de Paz (cuadrante_nomenclatura.kml).");
+                console.log("Capa KML no cargada aún o ruta en proceso.");
             })
             .addTo(map);
 
@@ -233,7 +357,6 @@
             resaltarCapa(layer);
             var props = layer.feature.properties;
             
-            // Mapeo ordenado con las nuevas etiquetas del KML
             var codCuadrante = props.CUADRANTE || props.nomenclatura || props.name || 'Cuadrante de Paz';
             var nombreZona = props.NOMBRE || props.COMUNA || '';
             
@@ -278,7 +401,35 @@
             }
         }
 
-        // Buscador Coexistente: KML interno + Nominatim OSM (limitado a Barinas, Venezuela)
+        function manejarInputBusqueda(query) {
+            var clearBtn = document.getElementById('clearBtn');
+            if (query.length > 0) {
+                clearBtn.style.display = 'flex';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+            buscarMulticriterio(query);
+        }
+
+        function limpiarBusqueda() {
+            document.getElementById('busqueda').value = '';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('suggestions').style.display = 'none';
+            document.getElementById('infoCard').style.display = 'none';
+
+            if (marcadorBusqueda) {
+                map.removeLayer(marcadorBusqueda);
+                marcadorBusqueda = null;
+            }
+
+            if (capaSeleccionada) {
+                capaSeleccionada.setStyle(estiloNormal);
+                capaSeleccionada = null;
+            }
+
+            centrarUbicacion();
+        }
+
         var timeoutId;
         function buscarMulticriterio(query) {
             clearTimeout(timeoutId);
@@ -292,7 +443,6 @@
 
             var q = query.toLowerCase();
 
-            // 1. Filtrar coincidencias del KML (Cuadrantes, Zonas, Municipios, Parroquias)
             var coincidenciasKML = listaCuadrantes.filter(item => {
                 var p = item.props;
                 var cuad = (p.CUADRANTE || p.nomenclatura || '').toLowerCase();
@@ -304,7 +454,6 @@
             });
 
             timeoutId = setTimeout(() => {
-                // 2. Consultar Nominatim OSM restringido al Estado Barinas, Venezuela
                 var urlOSM = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + " Barinas Venezuela")}&limit=4`;
 
                 fetch(urlOSM)
@@ -313,17 +462,29 @@
                         suggestionsDiv.innerHTML = '';
                         var totalSugerencias = 0;
 
-                        // Mostrar primero los Cuadrantes del KML encontrados
                         if (coincidenciasKML.length > 0) {
-                            coincidenciasKML.slice(0, 4).forEach(item => {
+                            coincidenciasKML.slice(0, 5).forEach(item => {
                                 totalSugerencias++;
                                 var div = document.createElement('div');
                                 div.className = 'suggestion-item';
                                 var p = item.props;
-                                var tituloC = p.CUADRANTE || p.nomenclatura || p.name;
-                                div.innerHTML = `<span class="suggestion-tag">Cuadrante</span> <b>${tituloC}</b> - <small>${p.MUNICIPIO || ''}</small>`;
+                                
+                                var tituloC = p.CUADRANTE || p.nomenclatura || 'Cuadrante';
+                                var nombreComuna = p.NOMBRE || p.COMUNA || '';
+                                
+                                var textoSugerencia = `<span class="suggestion-tag">Cuadrante</span> <b>${tituloC}</b>`;
+                                if (nombreComuna) {
+                                    textoSugerencia += ` - <small style="color:#555;">${nombreComuna}</small>`;
+                                }
+                                if (p.MUNICIPIO) {
+                                    textoSugerencia += ` <small style="color:#888;">(${p.MUNICIPIO})</small>`;
+                                }
+                                
+                                div.innerHTML = textoSugerencia;
+
                                 div.onclick = function() {
-                                    document.getElementById('busqueda').value = tituloC;
+                                    document.getElementById('busqueda').value = tituloC + (nombreComuna ? ' - ' + nombreComuna : '');
+                                    document.getElementById('clearBtn').style.display = 'flex';
                                     suggestionsDiv.style.display = 'none';
                                     seleccionarCuadranteDirecto(item.layer);
                                 };
@@ -331,7 +492,6 @@
                             });
                         }
 
-                        // Mostrar luego los lugares externos de OpenStreetMap en Barinas
                         if (dataOSM.length > 0) {
                             dataOSM.forEach(item => {
                                 totalSugerencias++;
@@ -340,6 +500,7 @@
                                 div.innerHTML = `<span class="suggestion-tag-osm">Lugar</span> ${item.display_name}`;
                                 div.onclick = function() {
                                     document.getElementById('busqueda').value = item.display_name;
+                                    document.getElementById('clearBtn').style.display = 'flex';
                                     suggestionsDiv.style.display = 'none';
                                     
                                     var lat = parseFloat(item.lat);
@@ -349,7 +510,6 @@
                                     if (marcadorBusqueda) { map.removeLayer(marcadorBusqueda); }
                                     marcadorBusqueda = L.marker([lat, lon]).addTo(map).bindPopup(item.display_name).openPopup();
 
-                                    // Evaluar automáticamente si este lugar cae dentro de un cuadrante de paz
                                     evaluarYResaltarPunto(lat, lon);
                                 };
                                 suggestionsDiv.appendChild(div);
@@ -363,7 +523,6 @@
                         }
                     })
                     .catch(err => {
-                        // Si falla la red exterior, muestra al menos las coincidencias del KML
                         if (coincidenciasKML.length > 0) {
                             suggestionsDiv.style.display = 'block';
                         }

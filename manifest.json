@@ -1,0 +1,20 @@
+{
+  "name": "Ven911 Barinas Cuadrantes",
+  "short_name": "Ven911",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d2b45",
+  "theme_color": "#0d2b45",
+  "icons": [
+    {
+      "src": "icono.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icono.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

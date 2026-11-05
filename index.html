@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="shortcut icon" href="icono.png" type="image/x-icon">
     <link rel="manifest" href="manifest.json">
     <title>Ven911 Barinas: Cuadrantes</title>
@@ -251,7 +252,8 @@
         <div id="suggestions"></div>
     </div>
 
-    <button class="btn-ubicacion" onclick="centrarUbicacion()" title="Mi ubicación">📍</button>
+    <button class="btn-ubicacion" onclick="centrarUbicacion()" title="Mi ubicación"><span class="material-icons">
+    my_location</span></button>
 
      <!-- Panel de información de Cuadrante Activo -->
     <div id="infoCard" class="info-card">
@@ -522,13 +524,30 @@
                     });
             }, 300);
         }
-
+        var markerUbicacion, circuloUbicacion;
         function centrarUbicacion() {
             if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(function(position) {
                 userLat = position.coords.latitude;
                 userLon = position.coords.longitude;
                 map.setView([userLat, userLon], 15);
+
+                if (markerUbicacion) {
+                    map.removeLayer(markerUbicacion);
+                    map.removeLayer(circuloUbicacion);
+                }
+
+                // Creamos el punto exacto (marcador) y el círculo de precisión
+                markerUbicacion = L.marker([userLat, userLon]).addTo(map)
+                    .bindPopup("<b>¡Estás aquí!</b><br>Ubicación del Dispositivo").openPopup();
+                
+                circuloUbicacion = L.circle([userLat, userLon], { 
+                    radius: accuracy, 
+                    color: '#0056b3', 
+                    fillColor: '#3a87le', 
+                    fillOpacity: 0.15 
+                }).addTo(map);
+
                 evaluarYResaltarPunto(userLat, userLon);
             }, function() {}, { enableHighAccuracy: true, timeout: 10000 });
         }

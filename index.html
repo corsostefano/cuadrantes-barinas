@@ -404,7 +404,7 @@
             } catch(err){}
         }
 
-        function evaluarYResaltarPunto(lat, lon) {
+       function evaluarYResaltarPunto(lat, lon) {
             if (!kmlGeoJsonData) return;
             var punto = turf.point([parseFloat(lon), parseFloat(lat)]);
             var zonaEncontrada = null;
@@ -420,6 +420,14 @@
 
             if (zonaEncontrada) {
                 seleccionarCuadranteDirecto(zonaEncontrada);
+            } else {
+                // Si el punto está fuera de los cuadrantes cargados de Barinas
+                document.getElementById('cardTitulo').innerText = "Fuera de Cuadrante Mapeado";
+                document.getElementById('cardOrganismo').innerText = "Coordenadas: " + lat.toFixed(4) + ", " + lon.toFixed(4);
+                document.getElementById('cardZonas').innerText = "Ubicación actual fuera del límite operativo registrado.";
+                document.getElementById('cardUbicacion').innerText = "";
+                document.getElementById('cardBtnLlamar').style.display = 'none';
+                document.getElementById('infoCard').style.display = 'block';
             }
         }
 
@@ -525,31 +533,41 @@
             }, 300);
         }
         var markerUbicacion, circuloUbicacion;
+        var markerUbicacion, circuloUbicacion;
+
         function centrarUbicacion() {
             if (!navigator.geolocation) return;
+            
             navigator.geolocation.getCurrentPosition(function(position) {
                 userLat = position.coords.latitude;
                 userLon = position.coords.longitude;
+                var accuracy = position.coords.accuracy;
+
                 map.setView([userLat, userLon], 15);
 
+                // Borrar marcador anterior si existe
                 if (markerUbicacion) {
                     map.removeLayer(markerUbicacion);
                     map.removeLayer(circuloUbicacion);
                 }
 
-                // Creamos el punto exacto (marcador) y el círculo de precisión
+                // Dibujar punto exacto y círculo de precisión
                 markerUbicacion = L.marker([userLat, userLon]).addTo(map)
-                    .bindPopup("<b>¡Estás aquí!</b><br>Ubicación del Dispositivo").openPopup();
+                    .bindPopup("<b>¡Ubicación Actual!</b>").openPopup();
                 
                 circuloUbicacion = L.circle([userLat, userLon], { 
                     radius: accuracy, 
                     color: '#0056b3', 
-                    fillColor: '#3a87le', 
+                    fillColor: '#0056b3', 
                     fillOpacity: 0.15 
                 }).addTo(map);
 
+                // Evaluar en qué cuadrante cae este punto y mostrar la info
                 evaluarYResaltarPunto(userLat, userLon);
-            }, function() {}, { enableHighAccuracy: true, timeout: 10000 });
+
+            }, function(error) {
+                console.log("Error obteniendo GPS: " + error.message);
+            }, { enableHighAccuracy: true, timeout: 10000 });
         }
 
         function cerrarInfoCard() {
